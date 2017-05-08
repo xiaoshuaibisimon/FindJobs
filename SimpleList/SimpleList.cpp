@@ -41,7 +41,7 @@ typedef struct _List{
 void list_init(List * list,void (*destroy)(void *data));
 void list_destroy(List *list);
 int list_ins_next(List* list,ListElmt *element,const void * data);
-int list_rem_next(List* list,ListElmt *element,const void ** data);
+int list_rem_next(List* list,ListElmt *element,void ** data);
 
 
 /*链表初始化--O（1）*/
@@ -61,7 +61,7 @@ void list_destroy(List *list)
     while(list_size(list) > 0)
     {
         /*移除每一个元素*/
-        if(list_rem_next(list,NULL,(const void**)&data) == 0 && list->destroy != NULL)
+        if(list_rem_next(list,NULL,(void**)&data) == 0 && list->destroy != NULL)
         {
             /*调用用户自定义的内存回收函数*/
             list->destroy(data);
@@ -108,7 +108,7 @@ int list_ins_next(List* list,ListElmt *element,const void * data)
     return 0;
 }
 /*移除一个元素--O（1）*/
-int list_rem_next(List* list,ListElmt *element,const void ** data)
+int list_rem_next(List* list,ListElmt *element, void ** data)
 {
     /*缓存旧元素*/
     ListElmt * old_element;
@@ -143,6 +143,44 @@ int list_rem_next(List* list,ListElmt *element,const void ** data)
 
     /*更新节点个数*/
     list->size--;
+
+    return 0;
+}
+
+/*分配页帧*/
+int alloc_frame(List * frames)
+{
+    int frame_number,*data;
+
+    /*空闲页帧链表为空*/
+    if(list_size(frames) == 0)
+        return -1;
+    else
+    {
+        if(list_rem_next(frames,NULL,(void**)&data) != 0)//将可用页帧号取出来放到data指向的内存
+            return -1;
+        else
+        {
+            frame_number = *data;//取出页帧号
+            free(data);//释放缓存旧页帧号的空间--并非链表元素内存--而是元素的数据指针指向的内存
+        }
+    }
+    return frame_number;//返回可用页帧号
+}
+
+
+/*回收页帧*/
+int free_frame(List * frames,int frame_number)
+{
+    int *data;//缓存主调函数传递进来的页帧号--需要插入一个新的页帧号到空闲页帧链表里面
+
+    if((data = (int *)malloc(sizeof(int))) == NULL)//分配内存
+        return -1;
+
+    *data = frame_number;//缓存页帧号
+
+    if(list_ins_next(frames,NULL,(void *)data) != 0)//插入新的可用页帧号
+        return -1;
 
     return 0;
 }
