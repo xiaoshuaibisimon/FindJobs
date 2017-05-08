@@ -1,5 +1,6 @@
-#include <QCoreApplication>
-#include <QDebug>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct _ListElmt
 {
@@ -146,11 +147,7 @@ int list_rem_next(List* list,ListElmt *element,const void ** data)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main()
 {
-    QCoreApplication a(argc, argv);
-
-    qDebug()<<"alohajack";
-
-    return a.exec();
+    return 0;
 }
