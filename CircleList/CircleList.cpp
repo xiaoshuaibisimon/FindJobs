@@ -118,6 +118,26 @@ int clist_rem_next(CList *list,CListElmt * element,void ** data)
     return 0;
 }
 
+
+//LRU--第二次机会页面置换算法
+typedef struct _Page
+{
+    int number;
+    int reference;
+}Page;
+
+
+int replace_page(CListElmt **current)
+{
+    while(((Page*)((*current)->data))->reference != 0)
+    {
+        ((Page*)((*current)->data))->reference = 0;
+        *current = clist_next(*current);
+    }
+
+    return ((Page*)((*current)->data))->number;
+}
+
 int main()
 {
     return 0;
