@@ -181,35 +181,37 @@ int                type;
 
 } Event;
 
+//接收新事件
 int receive_event(Queue *events,const Event *event)
 {
-    Event   *new_event;
+    Event   *new_event;//缓存新事件
 
-    if((new_event = (Event*)malloc(sizeof(Event))) == NULL)
+    if((new_event = (Event*)malloc(sizeof(Event))) == NULL)//分配内存
         return -1;
 
-    memcpy(new_event,event,sizeof(Event));
+    memcpy(new_event,event,sizeof(Event));//拷贝事件相关的数据
 
-    if(queue_enqueue(events,new_event) != 0)
+    if(queue_enqueue(events,new_event) != 0)//将新事件加入队列
         return -1;
 
     return 0;
 }
 
+//处理事件
 int process_event(Queue *events,int(*dispatch)(Event * event))
 {
-    Event * event = NULL;
+    Event * event = NULL;//即将处理的事件--队列头部
 
-    if(queue_size(events) == 0)
+    if(queue_size(events) == 0)//不允许处理非空队列
         return -1;
     else
     {
-        if(queue_dequeue(events,(void **)&events) != 0)
+        if(queue_dequeue(events,(void **)&events) != 0)//将队列里最开头的事件取出来
             return -1;
         else
         {
-            dispatch(event);
-            free(event);
+            dispatch(event);//处理事件
+            free(event);//释放事件所占的内存
         }
     }
 
