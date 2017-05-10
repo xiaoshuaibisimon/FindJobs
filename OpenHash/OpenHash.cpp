@@ -291,7 +291,7 @@ int ohtbl_remove(OHTbl * htbl, void **data)
     }
     return -1;
 }
-
+//
 int ohtbl_lookup(const OHTbl * htbl, void **data)
 {
     int position,
