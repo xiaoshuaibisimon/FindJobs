@@ -153,14 +153,14 @@ int list_rem_next(List* list,ListElmt *element, void ** data)
 typedef struct _CHTbl
 {
 
-    int buckets;
+    int buckets;//链表数量/桶数
 
-    int (*h)(const void *key);
-    int (*match)(const void * key1,const void * key2);
-    void (*destroy)(void * data);
+    int (*h)(const void *key);//哈希函数
+    int (*match)(const void * key1,const void * key2);//匹配函数
+    void (*destroy)(void * data);//回收内存
 
-    int size;
-    List * table;
+    int size;//元素个数
+    List * table;//哈希表
 
 }CHTbl;
 
@@ -187,20 +187,25 @@ int chtbl_init(CHTbl * htbl,int buckets,int (*h)(const void *key),
 {
     int i = 0;
 
+    //分配内存
     if((htbl->table = (List *)malloc(buckets * sizeof(List))) == NULL)
         return -1;
 
+    //重置桶数
     htbl->buckets = buckets;
 
+    //初始化每一个桶/链表
     for(i = 0;i < htbl->buckets;i++)
     {
         list_init(&htbl->table[i],destroy);
     }
 
+    //重置相关回调函数
     htbl->h = h;
     htbl->match = match;
     htbl->destroy = destroy;
 
+    //重置元素个数
     htbl->size = 0;
     return 0;
 }
@@ -210,13 +215,16 @@ int chtbl_init(CHTbl * htbl,int buckets,int (*h)(const void *key),
 void chtbl_destroy(CHTbl *htbl)
 {
     int i = 0;
+    //销毁每一个桶
     for(i = 0;i < htbl->buckets;i++)
     {
         list_destroy(&htbl->table[i]);
     }
 
+    //释放为总的桶分配的内存
     free(htbl->table);
 
+    //清空哈希表结构体
     memset(htbl,0,sizeof(CHTbl));
 
     return ;
@@ -228,34 +236,34 @@ int chtbl_insert(CHTbl * htbl,const void * data)
     void *temp;
     int  bucket,retval;
 
-    temp = (void *)data;
+    temp = (void *)data;//缓存数据
 
-    if(chtbl_lookup(htbl,&temp) == 0)
+    if(chtbl_lookup(htbl,&temp) == 0)//查询是否已存在
         return 1;
 
-    bucket = htbl->h(data) % htbl->buckets;//k%m得到索引\哈希表中的位置\槽位
+    bucket = htbl->h(data) % htbl->buckets;//k%m得到索引\哈希表中的位置\槽位--获取槽位
 
-    if((retval = list_ins_next(&htbl->table[bucket],NULL,data)) == 0)
+    if((retval = list_ins_next(&htbl->table[bucket],NULL,data)) == 0)//插入元素到具体桶中
         htbl->size++;
 
-    return retval;
+    return retval;//返回插入结果
 }
 
 //O(1)
 int chtbl_remove(CHTbl * htbl,void ** data)
 {
-    ListElmt *element,
-            *prev;
-    int bucket;
+    ListElmt *element,//遍历某个桶时用于缓存桶中元素
+            *prev;//记录要删除元素前面的元素
+    int bucket;//索引--根据键得到
 
-    bucket = htbl->h(*data) % htbl->buckets;
+    bucket = htbl->h(*data) % htbl->buckets;//根据哈希函数获取键，再根据键获取索引--用于确定哪一个桶
     prev = NULL;
 
-    for(element = list_head(&htbl->table[bucket]);element != NULL;element = list_next(element))
+    for(element = list_head(&htbl->table[bucket]);element != NULL;element = list_next(element))//遍历具体的桶
     {
-        if(htbl->match(*data,list_data(element)))
+        if(htbl->match(*data,list_data(element)))//是否匹配目标元素
         {
-            if(list_rem_next(&htbl->table[bucket],prev,data)== 0)
+            if(list_rem_next(&htbl->table[bucket],prev,data)== 0)//删除元素
             {
                 htbl->size--;
                 return 0;
@@ -265,7 +273,7 @@ int chtbl_remove(CHTbl * htbl,void ** data)
                 return -1;
             }
         }
-        prev = element;
+        prev = element;//重置前驱元素
     }
     return -1;
 }
@@ -278,11 +286,11 @@ int chtbl_lookup(const CHTbl * htbl,void ** data)
 
     bucket = htbl->h(*data) % htbl->buckets;
 
-    for(element = list_head(&htbl->table[bucket]);element != NULL;element = list_next(element))
+    for(element = list_head(&htbl->table[bucket]);element != NULL;element = list_next(element))//遍历桶
     {
-        if(htbl->match(*data,list_data(element)))
+        if(htbl->match(*data,list_data(element)))//匹配目标元素
         {
-            *data = list_data(element);
+            *data = list_data(element);//取出数据
             return 0;
         }
     }
@@ -320,34 +328,36 @@ Token lex(const char *istream, CHTbl *symtbl)
             retval,
             i;
 
+    //分配内存
     if((symbol = (Symbol*)malloc(sizeof(Symbol))) == NULL)
     {
         return error;
     }
 
-    if((symbol->lexeme = next_token(istream)) == NULL)
+    //处理输入流
+    if((symbol->lexeme = next_token(istream)) == NULL)//没有可用字符串
     {
         free(symbol);
         return lexit;
     }
     else
     {
-        symbol->token = digit;
+        symbol->token = digit;//默认是数字类型的标识符
 
-        length = strlen(symbol->lexeme);
+        length = strlen(symbol->lexeme);//获取字符串长度
 
         for(i = 0;i < length;i++)
         {
-            if(!isdigit(symbol->lexeme[i]))
+            if(!isdigit(symbol->lexeme[i]))//检测是否真的是数字
             {
-                symbol->token = other;
+                symbol->token = other;//不是数字
                 break;
             }
         }
 
-        memcpy(&token,&symbol->token,sizeof(Token));
+        memcpy(&token,&symbol->token,sizeof(Token));//拷贝类型
 
-        if((retval = chtbl_insert(symtbl,symbol)) < 0)
+        if((retval = chtbl_insert(symtbl,symbol)) < 0)//插入符号表
         {
             free(symbol);
             return error;
@@ -358,7 +368,7 @@ Token lex(const char *istream, CHTbl *symtbl)
         }
     }
 
-    return token;
+    return token;//返回类型给解释器
 
 }
 
