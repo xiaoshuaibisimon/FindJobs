@@ -151,16 +151,16 @@ int list_rem_next(List* list,ListElmt *element, void ** data)
 
 typedef struct _OHTbl
 {
-    int     positions;
-    void    *vacated;
+    int     positions;//槽位数
+    void    *vacated;//标志某个槽是否之前已经删除过元素
 
-    int (*h1)(const void * key);
-    int (*h2)(const void * key);
-    int (*match)(const void * key1,const void * key2);
-    void (*destroy)(void * data);
+    int (*h1)(const void * key);//哈希函数，一般是k mod  m
+    int (*h2)(const void * key);//哈希函数，一般是1 + （k mod m'），其中m'是m-1或者m-2
+    int (*match)(const void * key1,const void * key2);//匹配函数
+    void (*destroy)(void * data);//回收函数
 
-    int size;
-    void **table;
+    int size;//元素个数
+    void **table;//数组--哈希表本质就是数组--数组里面的元素都是void*--二级指针内存模型
 
 }OHTbl;
 
@@ -183,8 +183,8 @@ int ohtbl_remove(OHTbl * htbl, void **data);
 
 //O(1)
 int ohtbl_lookup(const OHTbl * htbl, void **data);
-
-static char vacated;
+//线性探测---（k  mod  m  + i） mod m--很低效，冲突太多
+static char vacated;//辅助标记位置，仅仅辅助作用，不做任何修改
 
 int ohtbl_init(OHTbl *htbl,int positions,int (*h1)(const void * key),
                int (*h2)(const void * key),int (*match)(const void * key1,const void * key2),
@@ -192,24 +192,25 @@ int ohtbl_init(OHTbl *htbl,int positions,int (*h1)(const void * key),
 {
     int i = 0;
 
-    if((htbl->table = (void **)malloc(positions * sizeof(void *))) == NULL)
+    if((htbl->table = (void **)malloc(positions * sizeof(void *))) == NULL)//分配内存
         return -1;
 
-    htbl->positions = positions;
+    htbl->positions = positions;//重置元素个数
 
-    for(i = 0;i < htbl->positions;i++)
+    for(i = 0;i < htbl->positions;i++)//初始化槽里面的每一个元素
     {
         htbl->table[i] = NULL;
     }
 
-    htbl->vacated = &vacated;
+    htbl->vacated = &vacated;//指向标记位置
 
+    //各成员函数初始化
     htbl->h1 = h1;
     htbl->h2 = h2;
     htbl->match = match;
     htbl->destroy = destroy;
 
-    htbl->size = 0;
+    htbl->size = 0;//元素个数初始化
 
     return 0;
 }
@@ -218,18 +219,18 @@ void ohtbl_destroy(OHTbl *htbl)
 {
     int i = 0;
 
-    if(htbl->destroy != NULL)
+    if(htbl->destroy != NULL)//如果回收函数不为空
     {
-        for(i = 0;i < htbl->positions;i++)
+        for(i = 0;i < htbl->positions;i++)//遍历每一个槽
         {
-            if(htbl->table != NULL && htbl->table[i] != htbl->vacated)
-                htbl->destroy(htbl->table[i]);
+            if(htbl->table != NULL && htbl->table[i] != htbl->vacated)//如果该槽不为空（有元素），而且之前没有被删除过元素
+                htbl->destroy(htbl->table[i]);//回收二级指针对应的内存
         }
     }
 
-    free(htbl->table);
+    free(htbl->table);//回收初始化函数里分配的内存--哈希表用的数组
 
-    memset(htbl,0,sizeof(OHTbl));
+    memset(htbl,0,sizeof(OHTbl));//清空哈希表结构体
 
     return ;
 }
@@ -240,26 +241,27 @@ int ohtbl_insert(OHTbl * htbl,const void *data)
     int position,
             i;
 
-    if(htbl->size == htbl->positions)
+    if(htbl->size == htbl->positions)//表已经满了
         return -1;
 
-    temp = (void *)data;
+    temp = (void *)data;//缓存要插入的元素
 
-    if(ohtbl_lookup(htbl,&temp) == 0)
+    if(ohtbl_lookup(htbl,&temp) == 0)//判断是否已存在
         return 1;
 
-    for(i = 0; i < htbl->positions;i++)
+    for(i = 0; i < htbl->positions;i++)//探测槽
     {
-        position = (htbl->h1(data) + (i*htbl->h2(data))) % htbl->positions;
+        position = (htbl->h1(data) + (i*htbl->h2(data))) % htbl->positions;//双散列
 
-        if(htbl->table[position] == NULL || htbl->table[position] == htbl->vacated)
+        if(htbl->table[position] == NULL || htbl->table[position] == htbl->vacated)//确实是空槽或者该槽以前的元素已被删除
         {
-            htbl->table[position] = (void *)data;
-            htbl->size++;
+            htbl->table[position] = (void *)data;//重置槽
+            htbl->size++;//更新个数
             return 0;
         }
     }
 
+    //探测失败
     return  -1;
 }
 
@@ -269,48 +271,52 @@ int ohtbl_remove(OHTbl * htbl, void **data)
     int position,
             i;
 
-    for(i = 0; i < htbl->positions;i++)
+    for(i = 0; i < htbl->positions;i++)//探测槽
     {
-        position = (htbl->h1(*data) + (i*htbl->h2(*data))) % htbl->positions;
+        position = (htbl->h1(*data) + (i*htbl->h2(*data))) % htbl->positions;//获取槽位置/索引
 
-        if(htbl->table[position] == NULL )
+        if(htbl->table[position] == NULL )//空槽--探测结束
         {
-            return -1;
+            return -1;//失败
         }
-        else if(htbl->table[position] == htbl->vacated)
+        else if(htbl->table[position] == htbl->vacated)//之前已经移除过元素了
         {
-            continue;
+            continue;//不用再删除该槽位置，探测下一个位置
         }
-        else if(htbl->match(htbl->table[position],*data))
+        else if(htbl->match(htbl->table[position],*data))//匹配上了
         {
-            *data = htbl->table[position];
-            htbl->size--;
-            htbl->table[position] = htbl->vacated;
+            *data = htbl->table[position];//获取要删除元素的数据
+            htbl->size--;//更新个数
+            htbl->table[position] = htbl->vacated;//标记该槽位置已经被删除过元素--不能简单的设置为NULL
             return 0;
         }
     }
+    //探测失败--没有找到匹配的数据
     return -1;
 }
-//
+
 int ohtbl_lookup(const OHTbl * htbl, void **data)
 {
     int position,
             i;
 
+    //双散列探测
     for(i = 0; i < htbl->positions;i++)
     {
-        position = (htbl->h1(*data) + (i*htbl->h2(*data))) % htbl->positions;
+        position = (htbl->h1(*data) + (i*htbl->h2(*data))) % htbl->positions;//获取索引
 
         if(htbl->table[position] == NULL )
-        {
+        {//空槽--找不到呗，不存在呗
             return -1;
         }
-        else if(htbl->match(htbl->table[position],*data))
+        else if(htbl->match(htbl->table[position],*data))//匹配上了
         {
-            *data = htbl->table[position];
+            *data = htbl->table[position];//获取数据
             return 0;
         }
     }
+
+    //没有找到
     return -1;
 }
 
