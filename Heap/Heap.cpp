@@ -99,7 +99,9 @@ int     heap_insert(Heap *heap,const void *data)
 int     heap_extract(Heap *heap,void **data)
 {
     void               *save,
-                       *temp;
+                       *temp;//按理说为了阅读性，应该顶一个另一个void ** 变量缓存新的数组起始地址
+                             //但是考虑到指针的本质--都是地址，多少级指针都只是一个机器字长的变量/内存空间，且void*是万能收纳盒
+                             //所以可用void*接收void**表示数组的新起始地址，后面赋值的时候进行强制类型转换即可
 
     int                ipos,
                        lpos,
