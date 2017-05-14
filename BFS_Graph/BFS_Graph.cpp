@@ -431,9 +431,9 @@ int covering(Set * members,Set *subsets,Set *cover)
 
 typedef struct _AdjList
 {
-        void *vertex;
-        Set adjacent;
-}AdjList;
+        void *vertex;//顶点数据域
+        Set adjacent;//顶点邻接表
+}AdjList;//顶点结构体
 
 
 typedef struct _Graph
@@ -811,11 +811,21 @@ typedef struct BfsVertex_
 } BfsVertex;
 
 
+/*这里稍微转换一下概念*/
+
+
+//邻接表结构链表中的元素都是邻接表--里面包含了实际顶点的数据域vertex
+//每一个邻接表都是由顶点数据域vertex和该顶点的邻接顶点集合adjacent组成
+
+//邻接顶点集合adjacent里面的元素就是单纯的顶点的数据域vertex
 
 //广度优先遍历图--寻找最短路径
 int bfs(Graph *graph, BfsVertex *start, List *hops)
 {
 
+    //实际上入队列的是邻接表--但是由于邻接表有一个数据成员是顶点，
+    //也就是说：一个顶点和一个邻接表相互对应，所以可以说是顶点入队列，这里的顶点是包含邻接点集合的大顶点
+    //而集合了里的顶点则是普通的实际有意义的数据对应的顶点结构体
     Queue              queue;
 
     AdjList            *adjlist,//缓存每次搜索的队列头部的元素
@@ -825,19 +835,20 @@ int bfs(Graph *graph, BfsVertex *start, List *hops)
                        *adj_vertex;//缓存邻接表中邻接顶点的数据域
 
     ListElmt           *element,//用于遍历链表--链表的元素是邻接表结构体/顶点结构体
-                       *member;//用于遍历邻接表--邻接表也是个集合，自然也是链表
+                       *member;//用于遍历邻接点集合--自然也是链表
 
     //初始化所有顶点--主要是颜色和跳数
     for (element = list_head(&graph_adjlists(graph)); element != NULL; element =
        list_next(element))
     {
 
-       clr_vertex = (BfsVertex*)(((AdjList *)list_data(element))->vertex);//获取链表节点数据域--就是实际的顶点--BfsVertex结构体
+       //链表节点是大顶点--包含集合
+       clr_vertex = (BfsVertex*)(((AdjList *)list_data(element))->vertex);//获取链表节点数据域--就是实际的小顶点--BfsVertex结构体
 
        if (graph->match(clr_vertex, start))//匹配上了起始顶点
        {
           //初始化起始顶点
-          clr_vertex->color = gray;//访问过的设置为灰色
+          clr_vertex->color = gray;//被发现了的设置为灰色
           clr_vertex->hops = 0;//跳数为0
 
        }
@@ -873,36 +884,36 @@ int bfs(Graph *graph, BfsVertex *start, List *hops)
 
     //广度优先搜索
     while (queue_size(&queue) > 0)
-    {
+    {//O（V）
 
        adjlist = (AdjList*)(queue_peek(&queue));//获取队列头部的元素（邻接表）--确切来说是一个顶点，该顶点包括了自己的数据域和邻接表
 
-       //遍历当前邻接表中的邻接顶点
+       //遍历当前顶点的所有邻接顶点组成的集合
        for (member = list_head(&adjlist->adjacent); member != NULL; member =
-          list_next(member))
+          list_next(member))//O（E）
        {
 
           adj_vertex = (BfsVertex*)(list_data(member));//取出实际的数据（邻接表中的顶点）--每一个顶点的数据域都是BfsVertex结构体
 
           //该顶点是否在图中
-          if (graph_adjlist(graph, adj_vertex, &clr_adjlist) != 0)//找到邻接表中的顶点在图中的位置
+          if (graph_adjlist(graph, adj_vertex, &clr_adjlist) != 0)//找到邻接表中的顶点在图中的位置--又得到一个邻接表
           {
-
              queue_destroy(&queue);
              return -1;
-
           }
 
-          clr_vertex = (BfsVertex*)(clr_adjlist->vertex);//缓存数据域（带插入队列的顶点结构体）--BfsVertex结构体
+          //取出邻接表中的数据域--也就是与 当前队列 头部元素 邻接的顶点--BfsVertex结构体--更新颜色和跳数
+          clr_vertex = (BfsVertex*)(clr_adjlist->vertex);
 
           //将找到的且之前没被访问过的顶点标记为灰色并加入队列
-          if (clr_vertex->color == white)
+          if (clr_vertex->color == white)//没有被发现过--既没有如果队列，更不用说被访问过
           {
 
-             clr_vertex->color = gray;//更新颜色
+             //没有被访问的意思是没有让他作为队列头部元素
+             clr_vertex->color = gray;//更新颜色--已经发现他了，并入了队列但是没有被访问--标记为灰色
              clr_vertex->hops = ((BfsVertex *)adjlist->vertex)->hops + 1;//更新跳数--前一个顶点的跳数+1--前一个顶点就是队列头部元素adjlist
 
-             if (queue_enqueue(&queue, clr_adjlist) != 0)//插入队列
+             if (queue_enqueue(&queue, clr_adjlist) != 0)//将新的邻接表插入队列队尾
              {
                 queue_destroy(&queue);
                 return -1;
@@ -912,12 +923,11 @@ int bfs(Graph *graph, BfsVertex *start, List *hops)
 
        }
 
-       //将已经访问过的顶点弹出队列，并将其设置为黑色--从此不再入队列了
+       //至此，当前队列头部元素顶点的邻接顶点已经全部发现/遍历
+       //将已经访问过（充当过队列头部元素）的邻接表弹出队列，并将其包含的顶点设置为黑色--从此不再入队列了
        if (queue_dequeue(&queue, (void **)&adjlist) == 0)
        {
-
-          ((BfsVertex *)adjlist->vertex)->color = black;//更新颜色
-
+          ((BfsVertex *)adjlist->vertex)->color = black;//更新颜色--针对
        }
        else
        {
@@ -927,6 +937,7 @@ int bfs(Graph *graph, BfsVertex *start, List *hops)
 
     }
 
+    //至此，从起始顶点开始可以到达的所有顶点都已经设置为黑色了
     //队列已经没有元素--广度优先搜索完成
     queue_destroy(&queue);
 
@@ -934,7 +945,7 @@ int bfs(Graph *graph, BfsVertex *start, List *hops)
     list_init(hops, NULL);
 
     for (element = list_head(&graph_adjlists(graph)); element != NULL; element =
-       list_next(element))
+       list_next(element))//O（V）
     {//遍历整个图的链表
 
        //跳过那些没有被访问的顶点--hop是-1，颜色是白色
