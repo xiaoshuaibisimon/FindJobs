@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 
 int
 issort(void * data,int size,int esize,
@@ -129,9 +130,79 @@ qksort(void *data,int size,int esize,int left,int right,
     //当left >= right的时候开始回归--每个区间只有一个元素--结束排序
     return 0;
 }
+/************************************************************************************/
+typedef struct _Directory
+{
+    char    name[MAXNAMLEN + 1];
+}Diretory;
 
+static int
+compare_dir(const void *key1,const void * key2)
+{
+    int retval;
+
+    if((retval = strcmp(((const Diretory *)key1)->name,((const Diretory *)key2)->name)) > 0)
+        return 1;
+    else if((retval = strcmp(((const Diretory *)key1)->name,((const Diretory *)key2)->name)) < 0)
+        return -1;
+    else
+        return 0;
+}
+
+int
+directls(const char *path,Diretory **dir)
+{
+
+    DIR             *dirptr;
+    Diretory        *tmp;
+    struct dirent   *curdir;
+    int             count,i;
+
+
+    if((dirptr = opendir(path)) == NULL)//打开目录
+        return -1;
+
+    *dir = NULL;
+    count = 0;
+
+    while((curdir = readdir(dirptr)) != NULL)//循环读取目录--一次只能返回一个目录文件节点
+    {
+        count++;
+
+        if((tmp = (Diretory*)realloc(*dir,count*sizeof(Diretory))) == NULL)//重新分配空间
+        {
+            free(*dir);
+            return -1;
+        }
+        else
+        {
+            *dir = tmp;//更新存储目录文件名的内存空间的起始地址
+        }
+
+        strcpy(((*dir)[count-1]).name,curdir->d_name);//赋值文件名
+    }
+
+    //关闭目录
+    closedir(dirptr);
+
+    //堆获取的文件名进行排序
+    if(qksort(*dir,count,sizeof(Diretory),0,count-1,compare_dir) != 0)
+        return -1;
+
+    //打印排好序的目录文件名
+    for(i = 0; i < count;i++)
+    {
+        printf("%s\n",((*dir)[i]).name);
+    }
+
+    return count;
+}
 
 int main()
 {
+    Diretory *dir =NULL;
+    directls("./",&dir);
+    free(dir);//记得回收内存
+
     return 0;
 }
