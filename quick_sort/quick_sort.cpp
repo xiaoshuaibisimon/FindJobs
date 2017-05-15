@@ -53,6 +53,7 @@ partition(void *data,int esize,int left,int right,
             * tmp;
     int r[3]={0};
 
+    //分配内存
     if((pval = (char *)malloc(esize)) == NULL)
         return -1;
 
@@ -63,13 +64,15 @@ partition(void *data,int esize,int left,int right,
     }
 
 
+    //选取中位数--随机法
     r[0] = (rand()%(right - left + 1)) + left;
     r[1] = (rand()%(right - left + 1)) + left;
     r[2] = (rand()%(right - left + 1)) + left;
 
-    issort(r,3,sizeof(int),compare_int);
-    memcpy(pval,&a[esize*r[1]],esize);
+    issort(r,3,sizeof(int),compare_int);//进行插入排序得到中位数--实际上是下标
+    memcpy(pval,&a[esize*r[1]],esize);//缓存枢纽--分割值
 
+    //做一下调整--否则在do-while里面直接递增/递减或漏掉首尾两端的元素
     left--;
     right++;
 
@@ -78,26 +81,28 @@ partition(void *data,int esize,int left,int right,
         do
         {
             right--;
-        }while(compare(&a[esize*right],pval) > 0);
+        }while(compare(&a[esize*right],pval) > 0);//向左找小的元素
         do
         {
             left++;
-        }while(compare(&a[esize*left],pval) < 0);
+        }while(compare(&a[esize*left],pval) < 0);//向右找大的元素
 
-        if(left >= right )
+        if(left >= right )//左边全是小的元素，右边全是大的--可以一分为二了
             break;
         else
-        {
+        {//如果还不能一分为二之前，发现位置错误（左边有大元素，右边有小的元素）--交换元素
             memcpy(tmp,&a[left*esize],esize);
             memcpy(&a[left*esize],&a[right*esize],esize);
             memcpy(&a[right*esize],tmp,esize);
         }
     }
 
+    //回收内存
     free(pval);
     free(tmp);
 
-    return right;
+    //返回右边的标志--因为先处理的是右边的下标（先从右往左）
+    return right;//分割值下标
 }
 
 int
@@ -106,17 +111,22 @@ qksort(void *data,int size,int esize,int left,int right,
 {
     int     mid;
 
+    //当传进来的 左边下标 大于等于 右边下标--意味着每一个区间都只有一个元素了--结束递归--开始返回
     while(left < right)
     {
+        //先找到分割值的下标
         if((mid = partition(data,esize,left,right,compare)) < 0)
             return -1;
 
+        //递归分割左半部分--至此左半部分层层递归求解
         if(qksort(data,size,esize,left,mid,compare) < 0)
             return -1;
 
+        //迭代以后--下次循环开始处理右半部分
         left = mid + 1;
     }
 
+    //当left >= right的时候开始回归--每个区间只有一个元素--结束排序
     return 0;
 }
 
