@@ -907,6 +907,61 @@ int shortest(Graph *graph,const PathVertex * start,List *paths,
 
 /****************************************************************************************************/
 
+int route(List *paths,PathVertex *destination,PathVertex **next,
+          int(*match)(const void *key1,const void * key2))
+{
+    PathVertex      *temp,
+                    *parent;
+
+    ListElmt        *element;
+    int             found;
+
+    found = 0;
+
+    //paths就是网关链表
+    //1. 寻找目的顶点/目标地址在paths中的位置
+    for(element = list_head(paths);element != NULL;element = list_next(element))
+    {
+        if(match(list_data(element),destination))
+        {//匹配上了目标地址
+            temp = (PathVertex*)list_data(element);//缓存目标网关
+            parent = temp->parent;//找到网关的父节点
+            found = 1;//匹配成功
+            break;
+        }
+    }
+
+    if(!found)//匹配失败直接返回
+        return -1;
+
+    //由于paths就是最短路径树对应的链表，所以反向寻找最后一个可达的父节点就是：从当前start网关开始，可将数据送达目标地址的的最短路径中的下一个网关
+    while(parent != NULL)
+    {
+        temp = (PathVertex*)list_data(element);//缓存当前网关--最短路径中离起始网关最近的下一个网关--每迭代一次，就更接近指定的起始网关
+
+        found = 0;
+
+        //遍历网关链表
+        for(element = list_head(paths);element != NULL;element = list_next(element))
+        {
+            if(match(list_data(element),parent))
+            {//找到了当前网关的父节点
+                parent = ((PathVertex*)list_data(element))->parent;//更新父节点--父节点的父节点
+                found = 1;//匹配上了
+                break;//准备寻找更上层的父节点
+            }
+        }
+
+        if(!found)
+            return -1;
+    }
+
+    //next指向的就是最近网关--输出参数--主调函数使用
+    *next = temp;
+
+    return 0;
+}
+
 int main()
 {
     return 0;
